@@ -7,6 +7,11 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+# Header agar dikenali sebagai browser (mencegah blokir dari server 1secmail)
+HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+}
+
 @bot.event
 async def on_ready():
     print(f"Bot berhasil masuk sebagai {bot.user}")
@@ -15,7 +20,7 @@ async def on_ready():
 async def tempmail(ctx):
     """Menghasilkan alamat email sementara baru."""
     try:
-        response = requests.get("https://www.1secmail.com/api/v1/?action=genRandomMailbox&count=1")
+        response = requests.get("https://www.1secmail.com/api/v1/?action=genRandomMailbox&count=1", headers=HEADERS)
         if response.status_code == 200:
             data = response.json()
             if data:
@@ -24,7 +29,7 @@ async def tempmail(ctx):
             else:
                 await ctx.send("Gagal menghasilkan email. Silakan coba lagi.")
         else:
-            await ctx.send("Gagal terhubung ke layanan temp mail.")
+            await ctx.send(f"Gagal terhubung ke layanan temp mail (Status: {response.status_code}).")
     except Exception as e:
         await ctx.send(f"Terjadi kesalahan: {e}")
 
@@ -38,7 +43,7 @@ async def inbox(ctx, email_address: str):
         
         login, domain = email_address.split("@")
         url = f"https://www.1secmail.com/api/v1/?action=getMessages&login={login}&domain={domain}"
-        response = requests.get(url)
+        response = requests.get(url, headers=HEADERS)
         
         if response.status_code == 200:
             messages = response.json()
@@ -66,7 +71,7 @@ async def baca_pesan(ctx, email_address: str, msg_id: int):
     try:
         login, domain = email_address.split("@")
         url = f"https://www.1secmail.com/api/v1/?action=readMessage&login={login}&domain={domain}&id={msg_id}"
-        response = requests.get(url)
+        response = requests.get(url, headers=HEADERS)
         
         if response.status_code == 200:
             data = response.json()
@@ -83,7 +88,7 @@ async def baca_pesan(ctx, email_address: str, msg_id: int):
         else:
             await ctx.send("Gagal membaca pesan.")
     except Exception as e:
-        await ctx.send(f"Terjadi kesalahan: {e}")
+        await ctx.send(f.get("Terjadi kesalahan: {e}"))
 
 if __name__ == "__main__":
     TOKEN = os.getenv("DISCORD_TOKEN")
@@ -91,4 +96,4 @@ if __name__ == "__main__":
         bot.run(TOKEN)
     else:
         print("Error: DISCORD_TOKEN tidak ditemukan di environment variables.")
-                   
+            
