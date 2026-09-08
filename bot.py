@@ -1,16 +1,15 @@
+            import os
+import random
+import string
 import discord
 from discord.ext import commands
 import requests
-import os
-import random
-import string
 
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 # Penyimpanan sementara untuk password akun
-# Format: { "email@domain.com": "password" }
 ACCOUNTS_DB = {}
 
 @bot.event
@@ -21,8 +20,7 @@ async def on_ready():
 async def tempmail(ctx):
     """Menghasilkan alamat email sementara baru."""
     try:
-        # 1. Ambil domain yang tersedia dari mail.gw
-        res_domain = requests.get("https://api.mail.gw/domains")
+        res_domain = requests.get("https://api.mail.gw/domains", timeout=10)
         if res_domain.status_code != 200:
             await ctx.send("Gagal terhubung ke layanan temp mail.")
             return
@@ -34,17 +32,15 @@ async def tempmail(ctx):
         
         domain = domains[0]["domain"]
         
-        # 2. Buat username & password random
         username = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))
         email = f"{username}@{domain}"
         password = username + "Pass123!"
         
-        # 3. Buat akun di mail.gw
         payload = {
             "address": email,
             "password": password
         }
-        res_create = requests.post("https://api.mail.gw/accounts", json=payload)
+        res_create = requests.post("https://api.mail.gw/accounts", json=payload, timeout=10)
         
         if res_create.status_code in [200, 201]:
             ACCOUNTS_DB[email] = password
@@ -52,6 +48,10 @@ async def tempmail(ctx):
         else:
             await ctx.send(f"Gagal membuat email (Status: {res_create.status_code}).")
             
+    except requests.exceptions.Timeout:
+        await ctx.send("Koneksi ke server temp mail timeout. Silakan coba lagi.")
+    except requests.exceptions.ConnectionError:
+        await ctx.send("Gagal terhubung ke jaringan server temp mail (koneksi terputus/diblokir).")
     except Exception as e:
         await ctx.send(f"Terjadi kesalahan: {e}")
 
@@ -65,12 +65,11 @@ async def inbox(ctx, email_address: str):
         
         password = ACCOUNTS_DB[email_address]
         
-        # 1. Dapatkan token akses (login)
         auth_payload = {
             "address": email_address,
             "password": password
         }
-        res_token = requests.post("https://api.mail.gw/token", json=auth_payload)
+        res_token = requests.post("https://api.mail.gw/token", json=auth_payload, timeout=10)
         if res_token.status_code != 200:
             await ctx.send("Gagal melakukan autentikasi ke layanan email.")
             return
@@ -78,8 +77,7 @@ async def inbox(ctx, email_address: str):
         token = res_token.json().get("token")
         headers = {"Authorization": f"Bearer {token}"}
         
-        # 2. Ambil daftar pesan
-        res_msgs = requests.get("https://api.mail.gw/messages", headers=headers)
+        res_msgs = requests.get("https://api.mail.gw/messages", headers=headers, timeout=10)
         if res_msgs.status_code == 200:
             data = res_msgs.json()
             messages = data.get("hydra:member", [])
@@ -99,6 +97,10 @@ async def inbox(ctx, email_address: str):
             await ctx.send(msg_list)
         else:
             await ctx.send("Gagal mengambil data inbox.")
+    except requests.exceptions.Timeout:
+        await ctx.send("Koneksi timeout saat mengecek inbox.")
+    except requests.exceptions.ConnectionError:
+        await ctx.send("Koneksi gagal saat terhubung ke server email.")
     except Exception as e:
         await ctx.send(f"Terjadi kesalahan: {e}")
 
@@ -112,12 +114,11 @@ async def baca_pesan(ctx, email_address: str, msg_id: str):
         
         password = ACCOUNTS_DB[email_address]
         
-        # 1. Dapatkan token akses
         auth_payload = {
             "address": email_address,
             "password": password
         }
-        res_token = requests.post("https://api.mail.gw/token", json=auth_payload)
+        res_token = requests.post("https://api.mail.gw/token", json=auth_payload, timeout=10)
         if res_token.status_code != 200:
             await ctx.send("Gagal melakukan autentikasi.")
             return
@@ -125,8 +126,7 @@ async def baca_pesan(ctx, email_address: str, msg_id: str):
         token = res_token.json().get("token")
         headers = {"Authorization": f"Bearer {token}"}
         
-        # 2. Ambil detail pesan
-        res_msg = requests.get(f"https://api.mail.gw/messages/{msg_id}", headers=headers)
+        res_msg = requests.get(f"https://api.mail.gw/messages/{msg_id}", headers=headers, timeout=10)
         if res_msg.status_code == 200:
             data = res_msg.json()
             sender = data.get("from", {}).get("address", "Unknown")
@@ -141,6 +141,10 @@ async def baca_pesan(ctx, email_address: str, msg_id: str):
             await ctx.send(embed=embed)
         else:
             await ctx.send("Gagal membaca pesan atau ID pesan tidak valid.")
+    except requests.exceptions.Timeout:
+        await ctx.send("Koneksi timeout saat membaca pesan.")
+    except requests.exceptions.ConnectionError:
+        await ctx.send("Koneksi gagal saat membaca pesan.")
     except Exception as e:
         await ctx.send(f"Terjadi kesalahan: {e}")
 
@@ -150,4 +154,4 @@ if __name__ == "__main__":
         bot.run(TOKEN)
     else:
         print("Error: DISCORD_TOKEN tidak ditemukan di environment variables.")
-            
+        
