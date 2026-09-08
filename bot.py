@@ -1,4 +1,4 @@
-            import os
+import os
 import random
 import string
 import discord
@@ -154,4 +154,4 @@ if __name__ == "__main__":
         bot.run(TOKEN)
     else:
         print("Error: DISCORD_TOKEN tidak ditemukan di environment variables.")
-        
+                
